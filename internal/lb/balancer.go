@@ -1,7 +1,7 @@
 package lb
 
-import "net/url"
+import "github.com/krishnaditya65/web-server/internal/types"
 
 type Balancer interface {
-	Next() (*url.URL, error)
+	Next() (*types.Upstream, error)
 }

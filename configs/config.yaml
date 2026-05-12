@@ -13,3 +13,8 @@ proxy:
 rate_limit:
   requests_per_second: 20
   burst: 50
+
+health:
+  path: "/"
+  interval_seconds: 5
+  timeout_seconds: 2

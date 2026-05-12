@@ -6,6 +6,13 @@ type Config struct {
 	Server ServerConfig `mapstructure:"server"`
 	Proxy  ProxyConfig  `mapstructure:"proxy"`
 	Rate   RateConfig   `mapstructure:"rate_limit"`
+	Health HealthConfig `mapstructure:"health"`
+}
+
+type HealthConfig struct {
+	Path            string `mapstructure:"path"`
+	IntervalSeconds int    `mapstructure:"interval_seconds"`
+	TimeoutSeconds  int    `mapstructure:"timeout_seconds"`
 }
 
 type ServerConfig struct {
