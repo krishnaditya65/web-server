@@ -2,6 +2,7 @@ package proxy
 
 import (
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"time"
@@ -203,18 +204,17 @@ func (e *Engine) updateActiveMetrics() {
 	}
 }
 
-// isMaxBytesError checks whether err is an *http.MaxBytesError.
+// isMaxBytesError checks whether err wraps an *http.MaxBytesError anywhere in its chain.
 func isMaxBytesError(err error, target **http.MaxBytesError) bool {
 	if err == nil {
 		return false
 	}
 	var mbe *http.MaxBytesError
-	if e, ok := err.(*http.MaxBytesError); ok {
+	if errors.As(err, &mbe) {
 		if target != nil {
-			*target = e
+			*target = mbe
 		}
 		return true
 	}
-	_ = mbe
 	return false
 }

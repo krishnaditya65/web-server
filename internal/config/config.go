@@ -149,6 +149,9 @@ func LoadAuto(path string) (*Config, error) {
 	}
 }
 
+// ApplyDefaultsForTest is an exported wrapper used by tests in other packages.
+func ApplyDefaultsForTest(cfg *Config) { applyDefaults(cfg) }
+
 func applyDefaults(cfg *Config) {
 	if cfg.Admin.Host == "" {
 		cfg.Admin.Host = "127.0.0.1"
