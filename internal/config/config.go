@@ -16,15 +16,32 @@ type HealthConfig struct {
 }
 
 type ServerConfig struct {
-	Host         string `mapstructure:"host"`
-	Port         int    `mapstructure:"port"`
-	ReadTimeout  int    `mapstructure:"read_timeout"`
-	WriteTimeout int    `mapstructure:"write_timeout"`
-	IdleTimeout  int    `mapstructure:"idle_timeout"`
+	Host                string `mapstructure:"host"`
+	Port                int    `mapstructure:"port"`
+	HTTPSPort           int    `mapstructure:"https_port"`
+	ReadTimeout         int    `mapstructure:"read_timeout"`
+	WriteTimeout        int    `mapstructure:"write_timeout"`
+	IdleTimeout         int    `mapstructure:"idle_timeout"`
+	TLSCertFile         string `mapstructure:"tls_cert_file"`
+	TLSKeyFile          string `mapstructure:"tls_key_file"`
+	RedirectHTTPToHTTPS bool   `mapstructure:"redirect_http_to_https"`
 }
 
 type ProxyConfig struct {
-	Upstreams []string `mapstructure:"upstreams"`
+	Algorithm string        `mapstructure:"algorithm"`
+	Routes    []RouteConfig `mapstructure:"routes"`
+}
+
+type RouteConfig struct {
+	Name       string           `mapstructure:"name"`
+	Host       string           `mapstructure:"host"`
+	PathPrefix string           `mapstructure:"path_prefix"`
+	Upstreams  []UpstreamConfig `mapstructure:"upstreams"`
+}
+
+type UpstreamConfig struct {
+	URL    string `mapstructure:"url"`
+	Weight int    `mapstructure:"weight"`
 }
 
 type RateConfig struct {
@@ -46,5 +63,21 @@ func Load() (*Config, error) {
 		return nil, err
 	}
 
+	applyDefaults(&cfg)
+
 	return &cfg, nil
+}
+
+func applyDefaults(cfg *Config) {
+	for i := range cfg.Proxy.Routes {
+		if cfg.Proxy.Routes[i].PathPrefix == "" {
+			cfg.Proxy.Routes[i].PathPrefix = "/"
+		}
+
+		for j := range cfg.Proxy.Routes[i].Upstreams {
+			if cfg.Proxy.Routes[i].Upstreams[j].Weight <= 0 {
+				cfg.Proxy.Routes[i].Upstreams[j].Weight = 1
+			}
+		}
+	}
 }

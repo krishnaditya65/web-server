@@ -1,14 +1,36 @@
 server:
   host: "0.0.0.0"
   port: 8080
+  https_port: 8443
+
   read_timeout: 15
   write_timeout: 15
   idle_timeout: 60
 
+  tls_cert_file: "./certs/server.crt"
+  tls_key_file: "./certs/server.key"
+
+  redirect_http_to_https: true
+
 proxy:
-  upstreams:
-    - "http://localhost:9001"
-    - "http://localhost:9002"
+  algorithm: "weighted_rr"
+
+  routes:
+    - name: "users"
+      host: ""
+      path_prefix: "/users"
+      upstreams:
+        - url: "http://localhost:9001"
+          weight: 3
+        - url: "http://localhost:9002"
+          weight: 1
+
+    - name: "default"
+      host: ""
+      path_prefix: "/"
+      upstreams:
+        - url: "http://localhost:9001"
+          weight: 1
 
 rate_limit:
   requests_per_second: 20
