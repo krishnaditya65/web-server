@@ -2,7 +2,6 @@ package lb
 
 import (
 	"errors"
-	"time"
 
 	"github.com/krishnaditya65/web-server/internal/types"
 )
@@ -12,9 +11,7 @@ type LeastConnections struct {
 }
 
 func NewLeastConnections(targets []*types.Upstream) *LeastConnections {
-	return &LeastConnections{
-		targets: targets,
-	}
+	return &LeastConnections{targets: targets}
 }
 
 func (l *LeastConnections) Next() (*types.Upstream, error) {
@@ -25,16 +22,18 @@ func (l *LeastConnections) Next() (*types.Upstream, error) {
 			continue
 		}
 
-		if t.CircuitOpen() {
-			continue
+		switch t.State() {
+		case types.CircuitOpen:
+			if !t.TryHalfOpen() {
+				continue
+			}
+		case types.CircuitHalfOpen:
+			if !t.TryHalfOpen() {
+				continue
+			}
 		}
 
-		if selected == nil {
-			selected = t
-			continue
-		}
-
-		if t.ActiveConns.Load() < selected.ActiveConns.Load() {
+		if selected == nil || t.ActiveConns.Load() < selected.ActiveConns.Load() {
 			selected = t
 		}
 	}
@@ -50,15 +49,14 @@ func (l *LeastConnections) Next() (*types.Upstream, error) {
 
 func (l *LeastConnections) Release(target *types.Upstream) {
 	target.ActiveConns.Add(-1)
+
+	if target.State() == types.CircuitHalfOpen {
+		target.RecordSuccess()
+	}
 }
 
 func (l *LeastConnections) MarkFailure(target *types.Upstream) {
-	target.FailureCount.Add(1)
-
-	if target.FailureCount.Load() >= 3 {
-		target.Healthy.Store(false)
-		target.OpenCircuit(30 * time.Second)
-	}
+	target.RecordFailure()
 }
 
 func (l *LeastConnections) Upstreams() []*types.Upstream {

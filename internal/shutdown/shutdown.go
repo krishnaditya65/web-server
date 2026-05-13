@@ -36,3 +36,20 @@ func Wait(logger *zap.Logger, stop func(context.Context) error) {
 
 	logger.Info("server shutdown complete")
 }
+
+// WatchReload listens for SIGHUP and calls reload on each signal.
+// Runs until the process exits — call in a goroutine.
+func WatchReload(logger *zap.Logger, reload func() error) {
+	sigs := make(chan os.Signal, 1)
+	signal.Notify(sigs, syscall.SIGHUP)
+
+	for range sigs {
+		logger.Info("SIGHUP received, reloading config")
+
+		if err := reload(); err != nil {
+			logger.Error("config reload failed", zap.Error(err))
+		} else {
+			logger.Info("config reloaded successfully")
+		}
+	}
+}

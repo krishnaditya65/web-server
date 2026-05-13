@@ -17,6 +17,10 @@ func buildRouteEngine(
 	route config.RouteConfig,
 	metricsRegistry *metrics.Registry,
 ) *Engine {
+	cbThreshold := intOr(route.CircuitBreaker.FailureThreshold, 3)
+	cbDuration := time.Duration(intOr(route.CircuitBreaker.OpenDurationSeconds, 30)) * time.Second
+	cbHalfOpen := intOr(route.CircuitBreaker.HalfOpenRequests, 1)
+
 	var upstreams []*types.Upstream
 
 	for _, raw := range route.Upstreams {
@@ -26,8 +30,11 @@ func buildRouteEngine(
 		}
 
 		up := &types.Upstream{
-			URL:    parsed,
-			Weight: raw.Weight,
+			URL:                parsed,
+			Weight:             raw.Weight,
+			CBFailureThreshold: cbThreshold,
+			CBOpenDuration:     cbDuration,
+			CBHalfOpenRequests: cbHalfOpen,
 		}
 
 		up.Healthy.Store(true)
@@ -46,18 +53,29 @@ func buildRouteEngine(
 	switch cfg.Proxy.Algorithm {
 	case "least_conn":
 		balancer = lb.NewLeastConnections(upstreams)
-
 	case "weighted_rr":
 		balancer = lb.NewWeightedRoundRobin(upstreams)
-
 	default:
 		balancer = lb.NewRoundRobin(upstreams)
 	}
+
+	maxRetries := intOr(route.MaxRetries, 2)
+	timeout := time.Duration(intOr(route.TimeoutSeconds, 30)) * time.Second
 
 	return NewEngine(
 		route.Name,
 		balancer,
 		transport.New(),
 		metricsRegistry,
+		maxRetries,
+		route.MaxBodyBytes,
+		timeout,
 	)
+}
+
+func intOr(v, def int) int {
+	if v == 0 {
+		return def
+	}
+	return v
 }

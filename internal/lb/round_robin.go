@@ -3,7 +3,6 @@ package lb
 import (
 	"errors"
 	"sync/atomic"
-	"time"
 
 	"github.com/krishnaditya65/web-server/internal/types"
 )
@@ -14,9 +13,7 @@ type RoundRobin struct {
 }
 
 func NewRoundRobin(targets []*types.Upstream) *RoundRobin {
-	return &RoundRobin{
-		targets: targets,
-	}
+	return &RoundRobin{targets: targets}
 }
 
 func (r *RoundRobin) Next() (*types.Upstream, error) {
@@ -27,8 +24,15 @@ func (r *RoundRobin) Next() (*types.Upstream, error) {
 			continue
 		}
 
-		if t.CircuitOpen() {
-			continue
+		switch t.State() {
+		case types.CircuitOpen:
+			if !t.TryHalfOpen() {
+				continue
+			}
+		case types.CircuitHalfOpen:
+			if !t.TryHalfOpen() {
+				continue
+			}
 		}
 
 		healthy = append(healthy, t)
@@ -39,7 +43,6 @@ func (r *RoundRobin) Next() (*types.Upstream, error) {
 	}
 
 	i := atomic.AddUint64(&r.counter, 1)
-
 	target := healthy[i%uint64(len(healthy))]
 	target.ActiveConns.Add(1)
 
@@ -48,15 +51,14 @@ func (r *RoundRobin) Next() (*types.Upstream, error) {
 
 func (r *RoundRobin) Release(target *types.Upstream) {
 	target.ActiveConns.Add(-1)
+
+	if target.State() == types.CircuitHalfOpen {
+		target.RecordSuccess()
+	}
 }
 
 func (r *RoundRobin) MarkFailure(target *types.Upstream) {
-	target.FailureCount.Add(1)
-
-	if target.FailureCount.Load() >= 3 {
-		target.Healthy.Store(false)
-		target.OpenCircuit(30 * time.Second)
-	}
+	target.RecordFailure()
 }
 
 func (r *RoundRobin) Upstreams() []*types.Upstream {
